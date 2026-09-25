@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+}
+
+group = 'rems.idea'
+version = '0.31.25'
+
+def ideaHome = providers.gradleProperty('ideaHome')
+        .orElse('C:/Program Files/JetBrains/IntelliJ IDEA 2026.1')
+        .get()
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    compileOnly fileTree("${ideaHome}/lib") { include '*.jar' }
+    compileOnly fileTree("${ideaHome}/plugins/java/lib") { include '*.jar' }
+    compileOnly fileTree("${ideaHome}/plugins/java/lib/modules") { include '*.jar' }
+}
+
+tasks.register('buildPlugin', Zip) {
+    dependsOn jar
+    archiveFileName = "mixin-descriptor-completion-${version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    into('mixin-descriptor-completion/lib') {
+        from tasks.jar
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+

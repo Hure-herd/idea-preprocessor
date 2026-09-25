@@ -1,0 +1,258 @@
+<idea-plugin>
+    <id>rems.idea.mixin-descriptor-completion</id>
+    <name>Mixin Descriptor Completion</name>
+    <vendor>REMS</vendor>
+    <version>0.31.31</version>
+    <description><![CDATA[
+        <p><b>为使用 ReplayMod Preprocessor 的多版本 Minecraft Mixin 项目提供版本感知的代码补全、跳转和编辑辅助。</b></p>
+
+        <p>插件会读取当前代码上方的 <code>//#if MC...</code> 或 <code>//#elseif MC...</code> 条件，选择满足条件的版本模块，
+        并使用该版本的 <code>build/preprocessed/main/java</code>、<code>src/main/java</code>、Minecraft、Mixin 和 MixinExtras 依赖进行解析。</p>
+
+        <h3>Mixin 补全</h3>
+        <ul>
+            <li>在普通 Mixin 注解和 <code>//$$</code> 行中补全 <code>@Inject</code>、<code>@At</code>、<code>@Shadow</code>、MixinExtras 注解及项目自定义注解。</li>
+            <li>动态读取真实注解类型，补全 <code>method</code>、<code>at</code>、<code>target</code>、<code>cancellable</code>、<code>value</code> 等实际可用属性。</li>
+            <li>补全目标方法名称、JVM 目标成员描述符以及 <code>HEAD</code>、<code>RETURN</code>、<code>INVOKE</code> 等真实注入点代码。</li>
+            <li>补全 Java 类、字段、方法、局部变量、方法参数、修饰符和基本类型，并按当前变量的实际类型提供成员候选。</li>
+        </ul>
+
+        <h3>版本感知跳转</h3>
+        <ul>
+            <li><code>//$$</code> 中的类、注解、注解属性、字段、方法、局部变量、Mixin 目标和注入点均支持 Ctrl+B 或 Ctrl+点击。</li>
+            <li>支持跳转到条件版本中的预处理声明和源码用法，包括静态导入常量与多行嵌套注解属性。</li>
+            <li>声明和引用均通过项目结构、导入、类型及版本模块动态解析，不依赖示例类名或字段名。</li>
+        </ul>
+
+        <h3>预处理指令</h3>
+        <ul>
+            <li>补全全部默认指令，包括 <code>if</code>、<code>ifdef</code>、<code>ifndef</code>、<code>elseif</code>、<code>elif</code>、<code>define</code>、<code>replace</code>、<code>case</code>、<code>import</code> 和 remap 开关。</li>
+            <li>识别组合条件、括号、否定、<code>defined</code>、条件别名、范围、集合、点分版本号以及嵌套和 fallback 分支。</li>
+            <li>在 <code>MC</code> 后补全比较、范围和逻辑运算符，并从 Gradle 构建或设置脚本的 <code>createNode</code> 声明动态补全版本代码。</li>
+            <li><code>//?</code>、<code>//#replace</code>、多行块和行内 case 中的 Java 片段使用与 <code>//$$</code> 相同的编辑辅助。</li>
+            <li><code>//#import</code> 支持类名补全、完整限定名插入与版本感知跳转。</li>
+            <li>嵌套的 <code>//#if</code> 条件块按层级使用不同颜色，同层的分支和 <code>//#endif</code> 保持配对颜色；该功能不依赖其他插件。</li>
+            <li>可在设置中启用换行自动插入 <code>//$$</code>；插件会根据预处理图中的主版本求值当前分支，并且只在已有配对 <code>//#endif</code> 的非主版本分支中插入。</li>
+        </ul>
+
+        <h3>编辑辅助</h3>
+        <ul>
+            <li>自动补全 <code>()</code>、<code>{}</code>、<code>[]</code> 和引号，并允许光标越过已有的右半边字符。</li>
+            <li>Java 修饰符和类型补全后自动添加空格；完整语句中的方法调用可自动添加分号。</li>
+            <li>检查 <code>@Inject</code> 处理方法签名，并提供 <i>Fix method signature</i> 快速修复。</li>
+            <li><code>//$$</code> 代码使用当前 IDEA Java 配色方案进行语法和语义着色，普通标识符和标点保留为注释灰色。</li>
+            <li>选中 Java 代码后，可从浮动工具栏直接用 MC 预处理条件包裹选区，自动生成 <code>//#if</code>、逐行 <code>//$$</code> 和 <code>//#endif</code>。</li>
+            <li>在版本源码或预处理输出中选中完整条件块后，可一键同步到主工程中对应的 <code>src/main/java</code> 文件。</li>
+        </ul>
+
+        <p><b>设置位置：</b>Settings | Tools | Mixin Descriptor Completion</p>
+    ]]></description>
+    <change-notes><![CDATA[
+        <h3>0.31.25</h3>
+        <ul>
+            <li>修复选择 MC 时错误删除 //#if 前缀的问题。</li>
+            <li>补全前缀判断与候选阶段保持一致，MC 只替换光标前的部分标识符。</li>
+        </ul>
+        <h3>0.31.24</h3>
+        <ul>
+            <li>部分条件变量优先补全为 MC 或 define 别名，不再被逻辑运算符候选抢占。</li>
+            <li>完整 MC 后继续显示比较运算符，完整条件项后才显示逻辑运算符。</li>
+        </ul>
+        <h3>0.31.23</h3>
+        <ul>
+            <li>在字符输入处理结束后异步打开预处理候选，避免 MC 后的运算符弹窗被 IDEA 随即关闭。</li>
+            <li>弹窗前重新读取当前行，兼容普通及任意嵌套层级的预处理指令。</li>
+        </ul>
+        <h3>0.31.22</h3>
+        <ul>
+            <li>从候选列表插入 MC 后自动继续弹出比较、范围和集合运算符补全。</li>
+        </ul>
+        <h3>0.31.21</h3>
+        <ul>
+            <li>从 createNode/link 预处理图动态确定主版本，并实际求值 if、elseif、else 和嵌套条件。</li>
+            <li>当前分支对主版本不生效时自动插入 //$$，对主版本生效时保持普通 Java 代码。</li>
+        </ul>
+        <h3>0.31.20</h3>
+        <ul>
+            <li>预处理条件块内回车时继承上一行的普通代码或 //$$ 编码风格。</li>
+            <li>普通 //#if 后不再强制插入 //$$；嵌套 //$$ 条件仍按层级自动续写。</li>
+        </ul>
+        <h3>0.31.19</h3>
+        <ul>
+            <li>所有可使用 return 的方法体位置均严格补全为无空格的 return;。</li>
+            <li>方法体外不再显示无效的 return 候选。</li>
+        </ul>
+        <h3>0.31.18</h3>
+        <ul>
+            <li>非 void 方法补全 return 时预先插入结尾分号，并将光标放在返回表达式位置。</li>
+        </ul>
+        <h3>0.31.17</h3>
+        <ul>
+            <li>在 //$$ Java 语句位置补全 return。</li>
+            <li>void 方法插入 return;，有返回值的方法插入 return 并保留值输入位置。</li>
+        </ul>
+        <h3>0.31.16</h3>
+        <ul>
+            <li>适配 Falcon Relaxing-Eyes Themes 的全部 Islands、明色和暗色编辑器方案。</li>
+            <li>启用 Falcon 方案时，注释内 Java 语法和嵌套条件层级读取其关键字、类名、方法、注解、字符串及数字颜色。</li>
+            <li>Falcon 未启用时继续使用插件原有配色，且无需安装 Falcon 才能运行。</li>
+        </ul>
+        <h3>0.31.15</h3>
+        <ul>
+            <li>在任意层数的 //$$ 前缀后支持预处理指令、运算符、版本、变量和 import 补全。</li>
+            <li>嵌套预处理指令补全后可继续自动添加所需空格。</li>
+        </ul>
+        <h3>0.31.14</h3>
+        <ul>
+            <li>嵌套条件中自动插入的 //$$ 继承各层实际缩进，并与上一层 //#if 对齐。</li>
+        </ul>
+        <h3>0.31.13</h3>
+        <ul>
+            <li>在嵌套条件块中回车时，按完整条件深度自动生成连续的 //$$ 前缀。</li>
+            <li>共享预处理解析现可识别 //$$ 前缀后的内嵌 if、elseif、else 和 endif。</li>
+            <li>仅当下方存在足以闭合当前全部嵌套层级的 endif 时自动插入 //$$。</li>
+        </ul>
+        <h3>0.31.12</h3>
+        <ul>
+            <li>移除嵌套 //$$ 标记之间相互覆盖的重复着色范围。</li>
+            <li>每个行首 //$$ 现在只使用其对应条件层级的唯一颜色。</li>
+        </ul>
+        <h3>0.31.11</h3>
+        <ul>
+            <li>修复嵌套代码行中第一个 //$$ 被错误染成最内层颜色的问题。</li>
+            <li>同一行的多个 //$$ 按出现顺序分别使用外层到内层的条件颜色。</li>
+        </ul>
+        <h3>0.31.10</h3>
+        <ul>
+            <li>让 //$$ 标记继承当前所在预处理条件层级的颜色。</li>
+            <li>退出内层条件后，后续 //$$ 标记自动恢复外层条件颜色。</li>
+        </ul>
+        <h3>0.31.9</h3>
+        <ul>
+            <li>修复 //$$ //#if 形式的内嵌预处理指令未参与嵌套层级配色的问题。</li>
+            <li>内嵌 if、elseif、else、endif 现在与普通预处理指令使用相同的配对颜色。</li>
+        </ul>
+        <h3>0.31.8</h3>
+        <ul>
+            <li>移除 Rainbow Brackets 和 Rainbow Brackets Lite 的括号颜色联动。</li>
+            <li>保留独立的预处理条件嵌套配色和括号自动补全。</li>
+        </ul>
+        <h3>0.31.7</h3>
+        <ul>
+            <li>嵌套的 if、ifdef 和 ifndef 条件块按层级着色，并让 elseif、elif、else、endif 与所属条件保持同色。</li>
+            <li>预处理条件嵌套颜色由本插件提供，不依赖 Rainbow Brackets。</li>
+        </ul>
+        <h3>0.31.6</h3>
+        <ul>
+            <li>版本候选只显示点分 Minecraft 版本，移除 12104 等数字编码候选。</li>
+            <li>增加专用候选字符过滤器，输入等号、空格和其他普通字符时绝不接受当前候选。</li>
+        </ul>
+        <h3>0.31.5</h3>
+        <ul>
+            <li>彩虹括号联动同时支持 Rainbow Brackets 正式版和 Rainbow Brackets Lite。</li>
+            <li>正式版无法直接访问设置服务时，从 IDEA 配置中读取总开关、括号类型开关和颜色数量。</li>
+        </ul>
+        <h3>0.31.4</h3>
+        <ul>
+            <li>普通字符不再确认当前补全候选；输入字符只更新候选，使用 Tab 或 Enter 才插入选中项。</li>
+            <li>版本补全同时提供点分 Minecraft 版本和原有数字预处理编码，并优先显示点分版本。</li>
+        </ul>
+        <h3>0.31.3</h3>
+        <ul>
+            <li>安装并启用 Rainbow Brackets Lite 时，预处理注释中的括号跟随该插件的颜色方案、颜色数量和括号类型开关。</li>
+            <li>未安装或禁用 Rainbow Brackets Lite 时，预处理注释中的括号保持原有灰色。</li>
+        </ul>
+        <h3>0.31.2</h3>
+        <ul>
+            <li>为预处理注释中的圆括号、花括号和方括号增加按嵌套层级循环的配对颜色。</li>
+            <li>括号着色由本插件提供，不要求安装 Rainbow Brackets。</li>
+        </ul>
+        <h3>0.31.1</h3>
+        <ul>
+            <li>将最低兼容版本调整为 IntelliJ IDEA 2025.3（内部版本 253），并移除最高版本限制，以支持后续 IDEA 版本。</li>
+        </ul>
+        <h3>0.31.0</h3>
+        <ul>
+            <li>增加统一的 ReplayMod Preprocessor 条件解析器，并保留原有简单 MC 比较行为。</li>
+            <li>支持组合条件、括号、否定、范围、集合、点分版本号、简写条件、defined 与 define 别名。</li>
+            <li>支持 ifdef、ifndef、elif、define、error、warn、replace、case、endcase、import 和 remap 开关等默认指令补全。</li>
+            <li>支持 elseif、elif、else、嵌套条件及 case 分支对应版本模块的补全和跳转。</li>
+            <li>支持 //?、//#replace、/*$$ ... $$*/ 和行内 case 中 Java 代码的补全、配对输入及语法颜色。</li>
+            <li>支持 //#import 的类名补全、完整限定名插入和跳转。</li>
+            <li>从 build.gradle、build.gradle.kts、settings.gradle 和 settings.gradle.kts 动态读取版本节点。</li>
+            <li>同步功能识别 ifdef/ifndef、复杂分支以及 mainProjectFile/mainProjectFileRel。</li>
+        </ul>
+        <h3>0.30.2</h3>
+        <ul>
+            <li>修复 <code>//$$ ci.c</code> 等独立方法调用补全为 <code>ci.cancel()</code> 后未自动添加分号的问题。</li>
+            <li>修复同步新增条件块时可能删除相邻重复行（例如方法末尾 <code>}</code>）的问题。</li>
+            <li>同步位置改用连续多行上下文定位，完整保留条件块前后的构造方法、括号和空行。</li>
+            <li>增加 <i>Sync to Main src</i> 按钮，将版本目录中选中的完整预处理条件块安全同步到主源码同路径文件。</li>
+            <li>同步时动态读取项目目录和 <code>versions/mainProject</code>，并通过原代码或上下文定位写入位置；位置不唯一时停止写入。</li>
+            <li>为 <code>//$$</code> Java 代码增加主题自适应的语法与语义颜色。</li>
+            <li><code>@</code> 与注解名使用相同的注解颜色，未分类标识符和标点统一保持注释灰色。</li>
+            <li>类型名、限定类名和普通方法调用保持灰色；预处理条件分别着色指令、MC、比较运算符和版本号。</li>
+            <li><code>if</code>、<code>//#</code>、<code>//$$</code> 使用灰粉红色，普通类型、调用和标点统一使用浅灰色。</li>
+            <li><code>method</code>、<code>at</code>、<code>value</code>、<code>target</code> 等注解属性名统一使用浅灰色。</li>
+            <li>增加同步编辑器着色层，消除代码先显示灰色再切换到语义颜色的闪烁。</li>
+            <li>增加浮动选区工具栏按钮，一次性为选中代码添加完整预处理条件块。</li>
+            <li>修复浮动工具栏和右键菜单未提供 PSI 文件上下文时按钮被错误隐藏的问题。</li>
+            <li>整体压暗灰、黄、蓝、绿、紫等分支颜色，使预处理代码与正常 Java 代码明显区分。</li>
+            <li>完善插件概览和功能说明。</li>
+            <li>支持多行 <code>//$$</code> 注解属性跳转，包括 <code>validators</code>、<code>categories</code>、<code>options</code> 和 <code>strict</code>。</li>
+            <li>预处理指令与比较运算符候选显示用途说明，并支持动态版本代码补全。</li>
+            <li>改进条件版本中的字段、方法、静态导入常量及源码用法跳转。</li>
+        </ul>
+    ]]></change-notes>
+    <idea-version since-build="253"/>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <completion.contributor language="JAVA"
+                                implementationClass="rems.idea.mixincompletion.MixinDescriptorCompletionContributor"/>
+        <typedHandler implementation="rems.idea.mixincompletion.MixinCommentTypedHandler" order="first"/>
+        <completion.confidence language="JAVA"
+                               implementationClass="rems.idea.mixincompletion.MixinCommentCompletionConfidence"
+                               order="first"/>
+        <lookup.charFilter implementation="rems.idea.mixincompletion.MixinCompletionCharFilter"
+                           order="first"/>
+        <psi.referenceContributor language="JAVA"
+                                  implementation="rems.idea.mixincompletion.MixinCommentReferenceContributor"/>
+        <annotator language="JAVA"
+                   implementationClass="rems.idea.mixincompletion.MixinCommentSyntaxAnnotator"/>
+        <editorFactoryListener implementation="rems.idea.mixincompletion.MixinCommentImmediateHighlighter"/>
+        <enterHandlerDelegate implementation="rems.idea.mixincompletion.PreprocessorEnterHandler" order="first"/>
+        <applicationConfigurable id="rems.idea.mixincompletion.settings"
+                                 displayName="Mixin Descriptor Completion"
+                                 instance="rems.idea.mixincompletion.MixinCompletionConfigurable"/>
+        <localInspection language="JAVA"
+                         shortName="MixinCommentInjectSignature"
+                         displayName="Mixin comment Inject method signature"
+                         groupName="Mixin"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="rems.idea.mixincompletion.MixinCommentInjectSignatureInspection"/>
+    </extensions>
+    <actions>
+        <action id="rems.idea.mixincompletion.WrapWithPreprocessor"
+                class="rems.idea.mixincompletion.WrapWithPreprocessorAction"
+                text="Wrap with MC Preprocessor"
+                description="Add //#if, //$$ line prefixes, and //#endif to the selected code">
+            <add-to-group group-id="Floating.CodeToolbar"
+                          anchor="before"
+                          relative-to-action="Floating.CodeToolbar.Surround"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="rems.idea.mixincompletion.SyncPreprocessorToMainSource"
+                class="rems.idea.mixincompletion.SyncPreprocessorToMainSourceAction"
+                text="Sync to Main src"
+                description="Sync the selected preprocessor block to the matching file in the main src tree">
+            <add-to-group group-id="Floating.CodeToolbar"
+                          anchor="after"
+                          relative-to-action="rems.idea.mixincompletion.WrapWithPreprocessor"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
+
+
