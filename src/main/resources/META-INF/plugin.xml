@@ -1,8 +1,8 @@
 <idea-plugin>
-    <id>rems.idea.mixin-descriptor-completion</id>
-    <name>Mixin Descriptor Completion</name>
+    <id>rems.idea.preprocessor</id>
+    <name>Preprocessor Support</name>
     <vendor>REMS</vendor>
-    <version>0.31.31</version>
+    <version>0.31.33</version>
     <description><![CDATA[
         <p><b>为使用 ReplayMod Preprocessor 的多版本 Minecraft Mixin 项目提供版本感知的代码补全、跳转和编辑辅助。</b></p>
 
@@ -45,9 +45,18 @@
             <li>在版本源码或预处理输出中选中完整条件块后，可一键同步到主工程中对应的 <code>src/main/java</code> 文件。</li>
         </ul>
 
-        <p><b>设置位置：</b>Settings | Tools | Mixin Descriptor Completion</p>
+        <p><b>设置位置：</b>Settings | Tools | Preprocessor Support</p>
     ]]></description>
     <change-notes><![CDATA[
+        <h3>0.31.33</h3>
+        <ul>
+            <li>插件 ID 更名为 rems.idea.preprocessor，与新项目名称一致。</li>
+        </ul>
+        <h3>0.31.32</h3>
+        <ul>
+            <li>仓库和构建产物统一更名为 idea-preprocessor。</li>
+            <li>插件显示名称调整为 Preprocessor Support。</li>
+        </ul>
         <h3>0.31.25</h3>
         <ul>
             <li>修复选择 MC 时错误删除 //#if 前缀的问题。</li>
@@ -223,7 +232,7 @@
         <editorFactoryListener implementation="rems.idea.mixincompletion.MixinCommentImmediateHighlighter"/>
         <enterHandlerDelegate implementation="rems.idea.mixincompletion.PreprocessorEnterHandler" order="first"/>
         <applicationConfigurable id="rems.idea.mixincompletion.settings"
-                                 displayName="Mixin Descriptor Completion"
+                                 displayName="Preprocessor Support"
                                  instance="rems.idea.mixincompletion.MixinCompletionConfigurable"/>
         <localInspection language="JAVA"
                          shortName="MixinCommentInjectSignature"

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'rems.idea'
-version = '0.31.25'
+version = '0.31.33'
 
 def ideaHome = providers.gradleProperty('ideaHome')
         .orElse('C:/Program Files/JetBrains/IntelliJ IDEA 2026.1')
@@ -23,9 +23,9 @@ dependencies {
 
 tasks.register('buildPlugin', Zip) {
     dependsOn jar
-    archiveFileName = "mixin-descriptor-completion-${version}.zip"
+    archiveFileName = "idea-preprocessor-${version}.zip"
     destinationDirectory = layout.buildDirectory.dir('distributions')
-    into('mixin-descriptor-completion/lib') {
+    into('idea-preprocessor/lib') {
         from tasks.jar
     }
 }

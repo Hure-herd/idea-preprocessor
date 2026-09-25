@@ -14,7 +14,7 @@ public final class MixinCompletionConfigurable implements Configurable {
 
     @Override
     public @Nls String getDisplayName() {
-        return "Mixin Descriptor Completion";
+        return "Preprocessor Support";
     }
 
     @Override
