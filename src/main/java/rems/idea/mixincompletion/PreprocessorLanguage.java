@@ -177,7 +177,11 @@ final class PreprocessorLanguage {
     }
 
     static boolean isLineActive(List<String> lines, int targetLine, Map<String, Integer> variables) {
-        Map<String, String> definitions = collectDefinitions(lines);
+        return isLineActive(lines, targetLine, variables, collectDefinitions(lines));
+    }
+
+    static boolean isLineActive(List<String> lines, int targetLine, Map<String, Integer> variables,
+                                Map<String, String> definitions) {
         Deque<Branch> stack = new ArrayDeque<>();
         boolean active = true;
         boolean inCase = false;
@@ -264,6 +268,113 @@ final class PreprocessorLanguage {
         return active;
     }
 
+    /** Computes branch activity for every line in one pass. */
+    static boolean[] computeLineActivity(List<String> lines, Map<String, Integer> variables) {
+        Map<String, String> definitions = collectDefinitions(lines);
+        boolean[] lineActivity = new boolean[lines.size()];
+        Deque<Branch> stack = new ArrayDeque<>();
+        boolean active = true;
+        boolean inCase = false;
+        boolean caseMatched = false;
+
+        for (int index = 0; index < lines.size(); index++) {
+            String line = lines.get(index);
+            ParsedDirective directive = parseDirective(line);
+            if (directive == null) {
+                String replacementCondition = replacementCondition(line);
+                if (replacementCondition != null) {
+                    try {
+                        lineActivity[index] = active && evaluate(replacementCondition, variables, definitions);
+                    } catch (IllegalArgumentException ignored) {
+                        lineActivity[index] = false;
+                    }
+                    continue;
+                }
+
+                CaseBranch caseBranch = parseCaseBranch(line);
+                if (caseBranch == null) {
+                    lineActivity[index] = active;
+                    continue;
+                }
+
+                boolean matches = false;
+                if (!inCase || !caseMatched) {
+                    try {
+                        matches = caseBranch.fallback()
+                                || evaluate(caseBranch.condition(), variables, definitions);
+                    } catch (IllegalArgumentException ignored) {
+                        matches = false;
+                    }
+                }
+                boolean branchActive = active && matches && (!inCase || !caseMatched);
+                if (inCase && branchActive) caseMatched = true;
+                lineActivity[index] = branchActive;
+                continue;
+            }
+
+            String name = directive.name();
+            if (name.equals("replace")) {
+                String condition = replacementCondition(line);
+                try {
+                    lineActivity[index] = condition != null
+                            && active && evaluate(condition, variables, definitions);
+                } catch (IllegalArgumentException ignored) {
+                    lineActivity[index] = false;
+                }
+            } else if (name.equals("case")) {
+                inCase = true;
+                caseMatched = false;
+                lineActivity[index] = active;
+            } else if (name.equals("endcase")) {
+                inCase = false;
+                caseMatched = false;
+                lineActivity[index] = active;
+            } else if (name.equals("if") || name.equals("ifdef") || name.equals("ifndef")) {
+                boolean matches;
+                try {
+                    matches = switch (name) {
+                        case "ifdef" -> variables.containsKey(directive.argument());
+                        case "ifndef" -> !variables.containsKey(directive.argument());
+                        default -> evaluate(directive.argument(), variables, definitions);
+                    };
+                } catch (IllegalArgumentException ignored) {
+                    matches = false;
+                }
+                stack.push(new Branch(matches, matches, false));
+                active = allActive(stack);
+                lineActivity[index] = active;
+            } else if (name.equals("elseif") || name.equals("elif")) {
+                if (!stack.isEmpty()) {
+                    Branch previous = stack.pop();
+                    boolean matches = false;
+                    if (!previous.matched()) {
+                        try {
+                            matches = evaluate(directive.argument(), variables, definitions);
+                        } catch (IllegalArgumentException ignored) {
+                            matches = false;
+                        }
+                    }
+                    stack.push(new Branch(matches, previous.matched() || matches, previous.elseSeen()));
+                    active = allActive(stack);
+                }
+                lineActivity[index] = active;
+            } else if (name.equals("else")) {
+                if (!stack.isEmpty()) {
+                    Branch previous = stack.pop();
+                    stack.push(new Branch(!previous.matched(), previous.matched(), true));
+                    active = allActive(stack);
+                }
+                lineActivity[index] = active;
+            } else if (name.equals("endif")) {
+                if (!stack.isEmpty()) stack.pop();
+                active = allActive(stack);
+                lineActivity[index] = active;
+            } else {
+                lineActivity[index] = active;
+            }
+        }
+        return lineActivity;
+    }
     private static CaseBranch parseCaseBranch(String line) {
         String trimmed = line.strip();
         int marker = trimmed.startsWith("//?") ? 0 : trimmed.lastIndexOf("//?");
@@ -340,7 +451,7 @@ final class PreprocessorLanguage {
         return matcher.find() ? versionCode(matcher.group(1)) : -1;
     }
 
-    private static Map<String, String> collectDefinitions(List<String> lines) {
+    static Map<String, String> collectDefinitions(List<String> lines) {
         Map<String, String> result = new LinkedHashMap<>();
         for (String line : lines) {
             Matcher matcher = DEFINE.matcher(line);

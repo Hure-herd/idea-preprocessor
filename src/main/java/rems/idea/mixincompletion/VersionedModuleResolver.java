@@ -38,11 +38,19 @@ final class VersionedModuleResolver {
     static Module resolveModule(Project project, Document document, int currentLine) {
         if (!PreprocessorLanguage.hasVersionContext(document, currentLine)) return null;
 
+        List<String> lines = new ArrayList<>(document.getLineCount());
+        CharSequence source = document.getCharsSequence();
+        for (int line = 0; line < document.getLineCount(); line++) {
+            lines.add(source.subSequence(document.getLineStartOffset(line),
+                    document.getLineEndOffset(line)).toString());
+        }
+        Map<String, String> definitions = PreprocessorLanguage.collectDefinitions(lines);
         List<VersionedModule> candidates = new ArrayList<>();
         for (Module module : ModuleManager.getInstance(project).getModules()) {
             int code = PreprocessorLanguage.moduleVersionCode(module.getName());
             if (code >= 0 && module.getName().endsWith(".main")
-                    && PreprocessorLanguage.isLineActive(document, currentLine, Map.of("MC", code))) {
+                    && PreprocessorLanguage.isLineActive(lines, currentLine,
+                    Map.of("MC", code), definitions)) {
                 candidates.add(new VersionedModule(code, module));
             }
         }

@@ -70,8 +70,16 @@ public final class MixinCommentSyntaxAnnotator implements Annotator {
     static final Pattern EMBEDDED_PREPROCESSOR = Pattern.compile(
             "^\\s*((?://\\$\\$\\s*)+)(//#)([A-Za-z-]+)(?:\\s+(.*))?$");
     static final Pattern PREPROCESSOR_WORD = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
-    static final Pattern PREPROCESSOR_OPERATOR = Pattern.compile("&&|\\|\\||==|!=|<=|>=|<|>|\\.\\.|\\bin\\b|\\bnot\\b");
+    static final Pattern PREPROCESSOR_OPERATOR = Pattern.compile("&&|\\|\\||==|!=|<=|>=|<|>|\\.\\.|\\bin\\b|\\bnot\\b|!");
     static final Pattern PREPROCESSOR_NUMBER = Pattern.compile("(?<![A-Za-z_$])[0-9][0-9._]*(?![A-Za-z_$])");
+    static final Pattern PREPROCESSOR_CONTROL = Pattern.compile("\\b(?:if|ifdef|ifndef|elseif|elif|else|defined)\\b");
+
+    static boolean isConditionalDirective(String directive) {
+        return switch (directive) {
+            case "if", "ifdef", "ifndef", "elseif", "elif", "replace", "case" -> true;
+            default -> false;
+        };
+    }
 
     @Override
     public void annotate(@NotNull PsiElement element, @NotNull AnnotationHolder holder) {
@@ -106,6 +114,10 @@ public final class MixinCommentSyntaxAnnotator implements Annotator {
                         PREPROCESSOR_OPERATOR, MUTED_YELLOW);
                 colorMatches(holder, comment, condition, argumentStart,
                         PREPROCESSOR_NUMBER, MUTED_BLUE);
+                if (isConditionalDirective(preprocessor.group(2))) {
+                    colorMatches(holder, comment, condition, argumentStart,
+                            PREPROCESSOR_CONTROL, MUTED_ROSE);
+                }
                 if (codeStart >= 0) {
                     while (codeStart < argument.length() && Character.isWhitespace(argument.charAt(codeStart))) codeStart++;
                     String code = argument.substring(codeStart);
@@ -133,6 +145,10 @@ public final class MixinCommentSyntaxAnnotator implements Annotator {
                         PREPROCESSOR_OPERATOR, MUTED_YELLOW);
                 colorMatches(holder, comment, argument, argumentStart,
                         PREPROCESSOR_NUMBER, MUTED_BLUE);
+                if (isConditionalDirective(embeddedPreprocessor.group(3))) {
+                    colorMatches(holder, comment, argument, argumentStart,
+                            PREPROCESSOR_CONTROL, MUTED_ROSE);
+                }
             }
             colorLeadingCodeMarkers(holder, comment, text,
                     embeddedPreprocessor.start(1), embeddedPreprocessor.end(1));
@@ -151,6 +167,7 @@ public final class MixinCommentSyntaxAnnotator implements Annotator {
                     colorMatches(holder, comment, condition, 3, PREPROCESSOR_WORD, MUTED_PURPLE);
                     colorMatches(holder, comment, condition, 3, PREPROCESSOR_OPERATOR, MUTED_YELLOW);
                     colorMatches(holder, comment, condition, 3, PREPROCESSOR_NUMBER, MUTED_BLUE);
+                    colorMatches(holder, comment, condition, 3, PREPROCESSOR_CONTROL, MUTED_ROSE);
                 }
                 if (separator >= 0) {
                     color(holder, comment, 0, separator, separator + 1, MUTED_YELLOW);
@@ -185,6 +202,7 @@ public final class MixinCommentSyntaxAnnotator implements Annotator {
                 colorMatches(holder, comment, condition, restStart, PREPROCESSOR_WORD, MUTED_PURPLE);
                 colorMatches(holder, comment, condition, restStart, PREPROCESSOR_OPERATOR, MUTED_YELLOW);
                 colorMatches(holder, comment, condition, restStart, PREPROCESSOR_NUMBER, MUTED_BLUE);
+                colorMatches(holder, comment, condition, restStart, PREPROCESSOR_CONTROL, MUTED_ROSE);
             }
             if (separator >= 0) color(holder, comment, 0, separator, separator + 1, MUTED_YELLOW);
             if (codeStart >= 0) {

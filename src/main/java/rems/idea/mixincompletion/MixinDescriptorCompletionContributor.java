@@ -4,6 +4,7 @@ import com.intellij.codeInsight.completion.CompletionContributor;
 import com.intellij.codeInsight.AutoPopupController;
 import com.intellij.codeInsight.completion.CompletionParameters;
 import com.intellij.codeInsight.completion.CompletionProvider;
+import com.intellij.codeInsight.completion.CompletionResult;
 import com.intellij.codeInsight.completion.CompletionResultSet;
 import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.lookup.LookupElement;
@@ -145,9 +146,9 @@ public final class MixinDescriptorCompletionContributor extends CompletionContri
             PsiComment comment = PsiTreeUtil.getParentOfType(commentElement, PsiComment.class, false);
             int contextStart = comment == null ? lineStart : Math.max(lineStart, comment.getTextOffset());
             String physicalBeforeCaret = document.getText().substring(contextStart, offset);
-            String beforeCaret = MixinCommentContext.javaCodeBeforeCaret(document, offset);
-            if (beforeCaret == null) beforeCaret = physicalBeforeCaret;
-            String logicalContext = MixinCommentContext.logicalContext(document, offset);
+            String javaCodeBeforeCaret = MixinCommentContext.javaCodeBeforeCaret(document, offset);
+            String beforeCaret = javaCodeBeforeCaret == null
+                    ? physicalBeforeCaret : javaCodeBeforeCaret;
             LookupElement[] preprocessorItems = preprocessorItems(file, beforeCaret);
             if (preprocessorItems.length > 0) {
                 String prefix = preprocessorPrefix(file, beforeCaret);
@@ -155,60 +156,34 @@ public final class MixinDescriptorCompletionContributor extends CompletionContri
                 result.stopHere();
                 return;
             }
-            if (MixinCommentContext.javaCodeBeforeCaret(document, offset) == null) return;
+            if (javaCodeBeforeCaret == null) return;
 
-            Matcher attributeMatcher = COMMENT_ATTRIBUTE.matcher(beforeCaret);
-            String typedPrefix;
-            if (attributeMatcher.find()) {
-                typedPrefix = attributeMatcher.group(2);
-            } else {
-                Matcher atValueMatcher = COMMENT_AT_VALUE.matcher(logicalContext);
-                if (atValueMatcher.find()) {
-                    typedPrefix = atValueMatcher.group(1);
-                } else {
-                Matcher parametersMatcher = COMMENT_METHOD_PARAMETERS.matcher(beforeCaret);
-                if (parametersMatcher.find()) {
-                    typedPrefix = currentParameterPrefix(parametersMatcher.group(1));
-                } else {
-                Matcher annotationMatcher = COMMENT_ANNOTATION.matcher(beforeCaret);
-                if (annotationMatcher.find()) {
-                    typedPrefix = annotationMatcher.group(1);
-                } else {
-                    Matcher keywordMatcher = COMMENT_KEYWORD.matcher(beforeCaret);
-                    if (keywordMatcher.find()) {
-                        typedPrefix = keywordMatcher.group(1);
-                    } else {
-                        Matcher annotationAttributeMatcher =
-                                COMMENT_ANNOTATION_ATTRIBUTE.matcher(beforeCaret);
-                        if (annotationAttributeMatcher.find()) {
-                            typedPrefix = annotationAttributeMatcher.group(2);
-                        } else {
-                        MixinCommentContext.AnnotationAttribute annotationAttribute =
-                                MixinCommentContext.annotationAttribute(logicalContext);
-                        if (annotationAttribute != null) {
-                            typedPrefix = annotationAttribute.prefix();
-                        } else {
-                        Matcher memberMatcher = COMMENT_MEMBER.matcher(beforeCaret);
-                        if (memberMatcher.find()) {
-                            typedPrefix = memberMatcher.group(2);
-                        } else {
-                        Matcher identifierMatcher = COMMENT_IDENTIFIER.matcher(beforeCaret);
-                        if (!identifierMatcher.find()) return;
-                        typedPrefix = identifierMatcher.group(1);
-                        }
-                        }
-                        }
+            java.util.Set<String> existingLookupStrings = new java.util.HashSet<>();
+            LookupElement[] specificItems = mixinSpecificCommentItems(file, document, offset);
+            for (LookupElement item : specificItems) {
+                existingLookupStrings.add(item.getLookupString());
+            }
+            VirtualJavaView.PreparedCompletion javaCompletion = VirtualJavaView.prepare(
+                    file, document, offset, parameters.getInvocationCount(),
+                    parameters.getEditor(), parameters.getProcess());
+            CompletionResultSet commentResult = result.withPrefixMatcher(
+                    javaCompletion == null ? "" : javaCompletion.prefix());
+            boolean[] hasCandidates = {false};
+            for (LookupElement item : specificItems) {
+                commentResult.addElement(item);
+                hasCandidates[0] = true;
+            }
+            if (javaCompletion != null) {
+                javaCompletion.streamTo(completion -> {
+                    LookupElement item = completion.getLookupElement();
+                    if (!existingLookupStrings.contains(item.getLookupString())) {
+                        commentResult.passResult(CompletionResult.wrap(
+                                item, commentResult.getPrefixMatcher(), completion.getSorter()));
+                        hasCandidates[0] = true;
                     }
-                }
-                }
-                }
+                });
             }
-            CompletionResultSet commentResult = result.withPrefixMatcher(typedPrefix);
-            LookupElement[] commentItems = commentItems(file, document, offset);
-            if (commentItems.length > 0) {
-                commentResult.addAllElements(java.util.Arrays.asList(commentItems));
-                result.stopHere();
-            }
+            if (hasCandidates[0]) result.stopHere();
         }
     }
 
@@ -671,60 +646,28 @@ public final class MixinDescriptorCompletionContributor extends CompletionContri
 
     private record BytecodeCall(String owner, String name, String descriptor) {}
 
-    static LookupElement[] commentItems(PsiFile file, Document document, int offset) {
+    static LookupElement[] mixinSpecificCommentItems(PsiFile file, Document document, int offset) {
         if (!MixinCommentContext.isCompletionPosition(document, offset)) return LookupElement.EMPTY_ARRAY;
         int safeOffset = Math.max(0, Math.min(offset - 1, file.getTextLength() - 1));
         PsiElement position = file.findElementAt(safeOffset);
         if (position == null) return LookupElement.EMPTY_ARRAY;
 
         int line = document.getLineNumber(offset);
-        int lineStart = document.getLineStartOffset(line);
         String beforeCaret = MixinCommentContext.javaCodeBeforeCaret(document, offset);
         if (beforeCaret == null) return LookupElement.EMPTY_ARRAY;
         String logicalContext = MixinCommentContext.logicalContext(document, offset);
         Matcher matcher = COMMENT_ATTRIBUTE.matcher(beforeCaret);
-        Matcher annotationMatcher = COMMENT_ANNOTATION.matcher(beforeCaret);
         boolean attributePosition = matcher.find();
         Matcher atValueMatcher = COMMENT_AT_VALUE.matcher(logicalContext);
         boolean atValuePosition = !attributePosition && atValueMatcher.find();
-        boolean annotationPosition = !attributePosition && !atValuePosition && annotationMatcher.find();
-        Matcher keywordMatcher = COMMENT_KEYWORD.matcher(beforeCaret);
-        boolean keywordPosition = !attributePosition && !atValuePosition
-                && !annotationPosition && keywordMatcher.find();
-        Matcher parametersMatcher = COMMENT_METHOD_PARAMETERS.matcher(beforeCaret);
-        boolean parametersPosition = !attributePosition && !atValuePosition
-                && !annotationPosition && !keywordPosition && parametersMatcher.find();
-        Matcher annotationAttributeMatcher = COMMENT_ANNOTATION_ATTRIBUTE.matcher(beforeCaret);
         MixinCommentContext.AnnotationAttribute annotationAttribute =
                 MixinCommentContext.annotationAttribute(logicalContext);
         boolean annotationAttributePosition = !attributePosition && !atValuePosition
-                && !annotationPosition && !keywordPosition && !parametersPosition
                 && annotationAttribute != null;
-        Matcher identifierMatcher = COMMENT_IDENTIFIER.matcher(beforeCaret);
-        Matcher memberMatcher = COMMENT_MEMBER.matcher(beforeCaret);
-        boolean memberPosition = !attributePosition && !atValuePosition
-                && !annotationPosition && !keywordPosition && !parametersPosition
-                && !annotationAttributePosition && memberMatcher.find();
-        boolean identifierPosition = !attributePosition && !atValuePosition
-                && !annotationPosition && !keywordPosition && !parametersPosition
-                && !annotationAttributePosition
-                && !memberPosition
-                && identifierMatcher.find();
-        if (!attributePosition && !atValuePosition && !annotationPosition
-                && !keywordPosition && !parametersPosition && !annotationAttributePosition
-                && !memberPosition && !identifierPosition) {
-            return LookupElement.EMPTY_ARRAY;
-        }
 
         if (annotationAttributePosition) {
             return annotationAttributeItems(position, document, line,
                             annotationAttribute.annotation(), annotationAttribute.prefix())
-                    .toArray(LookupElement.EMPTY_ARRAY);
-        }
-
-        if (parametersPosition) {
-            return injectParameterItems(file, document, line, position,
-                    currentParameterPrefix(parametersMatcher.group(1)))
                     .toArray(LookupElement.EMPTY_ARRAY);
         }
 
@@ -733,27 +676,7 @@ public final class MixinDescriptorCompletionContributor extends CompletionContri
                     .toArray(LookupElement.EMPTY_ARRAY);
         }
 
-        if (keywordPosition) {
-            String prefix = keywordMatcher.group(1);
-            DeclarationNameContext declaration = declarationNameContext(beforeCaret);
-            if (declaration != null) {
-                return variableNameItems(declaration, prefix).toArray(LookupElement.EMPTY_ARRAY);
-            }
-
-            List<LookupElement> items = new ArrayList<>(
-                    keywordItems(prefix, hasPreviousDeclarationWord(beforeCaret)));
-            PsiClass currentTarget = findMixinTarget(position);
-            if (currentTarget != null) {
-                PsiClass targetClass = VersionedModuleResolver.retarget(
-                        currentTarget, file.getProject(), document, line);
-                Module selectedModule = VersionedModuleResolver.resolveModule(
-                        file.getProject(), document, line);
-                items.addAll(classItems(targetClass, selectedModule, prefix));
-            }
-            items.addAll(localVariableItems(document, line, offset, prefix));
-            items.addAll(expressionKeywordItems(prefix, document, line));
-            return items.toArray(LookupElement.EMPTY_ARRAY);
-        }
+        if (!attributePosition) return LookupElement.EMPTY_ARRAY;
 
         PsiClass currentTarget = findMixinTarget(position);
         if (currentTarget == null) return LookupElement.EMPTY_ARRAY;
@@ -761,27 +684,6 @@ public final class MixinDescriptorCompletionContributor extends CompletionContri
                 currentTarget, file.getProject(), document, line);
         Module selectedModule = VersionedModuleResolver.resolveModule(
                 file.getProject(), document, line);
-
-        if (memberPosition) {
-            return memberItems(targetClass, selectedModule, document, line,
-                            memberMatcher.group(1), memberMatcher.group(2),
-                            position, beforeCaret)
-                    .toArray(LookupElement.EMPTY_ARRAY);
-        }
-
-        if (identifierPosition) {
-            String prefix = identifierMatcher.group(1);
-            List<LookupElement> items = new ArrayList<>(
-                    classItems(targetClass, selectedModule, prefix));
-            items.addAll(localVariableItems(document, line, offset, prefix));
-            items.addAll(expressionKeywordItems(prefix, document, line));
-            return items.toArray(LookupElement.EMPTY_ARRAY);
-        }
-
-        if (annotationPosition) {
-            return annotationItems(targetClass, selectedModule, annotationMatcher.group(1))
-                    .toArray(LookupElement.EMPTY_ARRAY);
-        }
 
         List<LookupElement> items;
         if ("method".equals(matcher.group(1))) {

@@ -38,7 +38,14 @@ public final class MixinCompletionCharFilter extends CharFilter {
 
         // Typed characters must never accept a candidate. Tab and Enter are actions rather
         // than typed characters, so IDEA can continue to use them to finish the lookup.
-        if (Character.isJavaIdentifierPart(value) || value == '.') {
+        if (value == '.') {
+            // A Java dot changes the completion context from the qualifier to its
+            // members. Hide the old lookup so the typed handler can request a fresh
+            // virtual-Java completion. Preprocessor version numbers stay filterable.
+            return MixinCommentContext.isPreprocessorCompletionPosition(document, offset)
+                    ? Result.ADD_TO_PREFIX : Result.HIDE_LOOKUP;
+        }
+        if (Character.isJavaIdentifierPart(value)) {
             return Result.ADD_TO_PREFIX;
         }
         return Result.HIDE_LOOKUP;

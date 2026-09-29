@@ -5,7 +5,6 @@ import com.intellij.codeInsight.completion.CodeCompletionHandlerBase;
 import com.intellij.codeInsight.completion.CompletionType;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupManager;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -18,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.regex.Pattern;
 
 public final class MixinCommentTypedHandler extends TypedHandlerDelegate {
-    private static final Logger LOG = Logger.getInstance(MixinCommentTypedHandler.class);
     private static final Pattern COMPLETE_MC_EXPRESSION = Pattern.compile(
             "^\\s*(?://\\$\\$\\s*)*//#(?:if|elseif|elif|replace)\\s+MC\\s*$");
 
@@ -33,10 +31,8 @@ public final class MixinCommentTypedHandler extends TypedHandlerDelegate {
         }
         int caretOffset = editor.getCaretModel().getOffset();
         if (LookupManager.getActiveLookup(editor) != null
-                && (MixinCommentContext.isPreprocessorCompletionPosition(
-                        editor.getDocument(), caretOffset)
-                || MixinCommentContext.isCompletionPosition(
-                        editor.getDocument(), caretOffset))) {
+                && MixinCommentContext.isPreprocessorCompletionPosition(
+                        editor.getDocument(), caretOffset)) {
             LookupManager.getInstance(project).hideActiveLookup();
         }
         if ("(){}[]\"".indexOf(charTyped) < 0) return Result.CONTINUE;
@@ -80,21 +76,35 @@ public final class MixinCommentTypedHandler extends TypedHandlerDelegate {
         if (!isCompletionCharacter(charTyped)) return Result.CONTINUE;
 
         int offset = editor.getCaretModel().getOffset();
-        if (appendDirectiveSpace(editor.getDocument(), editor, offset)) {
+        Document document = editor.getDocument();
+        if (charTyped == '.'
+                && MixinCommentContext.javaCodeBeforeCaret(document, offset) != null
+                && MixinCommentContext.isCompletionPosition(document, offset)) {
+            // A member-access dot starts a new Java completion context. Do not let
+            // the previous identifier lookup swallow it or keep filtering its items.
+            LookupManager.getInstance(project).hideActiveLookup();
+            scheduleCommentLookup(project, editor);
             return Result.CONTINUE;
         }
-        if (MixinCommentContext.isPreprocessorCompletionPosition(editor.getDocument(), offset)) {
-            schedulePreprocessorLookup(project, editor, file);
-            return Result.CONTINUE;
-        }
-        if (!MixinCommentContext.isCompletionPosition(editor.getDocument(), offset)) {
+        if (LookupManager.getActiveLookup(editor) != null
+                && MixinCommentContext.isCompletionPosition(document, offset)) {
+            // Keep the Java lookup open so IDEA can filter its existing results as the
+            // user types, instead of rebuilding the virtual file for every character.
             return Result.CONTINUE;
         }
 
-        LookupElement[] items = MixinDescriptorCompletionContributor.commentItems(
-                file, editor.getDocument(), offset);
-        LOG.info("//$$ completion candidates: " + items.length);
-        showLookup(project, editor, items);
+        if (appendDirectiveSpace(document, editor, offset)) {
+            return Result.CONTINUE;
+        }
+        if (MixinCommentContext.isPreprocessorCompletionPosition(document, offset)) {
+            schedulePreprocessorLookup(project, editor, file);
+            return Result.CONTINUE;
+        }
+        if (!MixinCommentContext.isCompletionPosition(document, offset)) {
+            return Result.CONTINUE;
+        }
+
+        scheduleCommentLookup(project, editor);
         return Result.CONTINUE;
     }
 
@@ -127,6 +137,22 @@ public final class MixinCommentTypedHandler extends TypedHandlerDelegate {
                 return;
             }
             showLookup(project, editor, items);
+        });
+    }
+
+    private static void scheduleCommentLookup(Project project, Editor editor) {
+        Document document = editor.getDocument();
+        long modificationStamp = document.getModificationStamp();
+        int expectedOffset = editor.getCaretModel().getOffset();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (editor.isDisposed() || project.isDisposed()) return;
+            if (document.getModificationStamp() != modificationStamp
+                    || editor.getCaretModel().getOffset() != expectedOffset) return;
+            int offset = Math.min(editor.getCaretModel().getOffset(), document.getTextLength());
+            if (MixinCommentContext.javaCodeBeforeCaret(document, offset) == null) return;
+            CodeCompletionHandlerBase.createHandler(CompletionType.BASIC,
+                            false, true, false)
+                    .invokeCompletion(project, editor, 0);
         });
     }
 

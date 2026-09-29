@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'rems.idea'
-version = '0.31.33'
+version = '0.31.60'
 
 def ideaHome = providers.gradleProperty('ideaHome')
         .orElse('C:/Program Files/JetBrains/IntelliJ IDEA 2026.1')

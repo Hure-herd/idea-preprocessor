@@ -2,7 +2,7 @@
     <id>rems.idea.preprocessor</id>
     <name>Preprocessor Support</name>
     <vendor>REMS</vendor>
-    <version>0.31.33</version>
+    <version>0.31.60</version>
     <description><![CDATA[
         <p><b>为使用 ReplayMod Preprocessor 的多版本 Minecraft Mixin 项目提供版本感知的代码补全、跳转和编辑辅助。</b></p>
 
@@ -15,6 +15,7 @@
             <li>动态读取真实注解类型，补全 <code>method</code>、<code>at</code>、<code>target</code>、<code>cancellable</code>、<code>value</code> 等实际可用属性。</li>
             <li>补全目标方法名称、JVM 目标成员描述符以及 <code>HEAD</code>、<code>RETURN</code>、<code>INVOKE</code> 等真实注入点代码。</li>
             <li>补全 Java 类、字段、方法、局部变量、方法参数、修饰符和基本类型，并按当前变量的实际类型提供成员候选。</li>
+            <li>虚拟 Java 文件会显式加入原文件和当前版本源码的 import；例如 <code>MC&gt;1.21.1</code> 采用 1.21.2 对应模块的导入。</li>
         </ul>
 
         <h3>版本感知跳转</h3>
@@ -48,6 +49,77 @@
         <p><b>设置位置：</b>Settings | Tools | Preprocessor Support</p>
     ]]></description>
     <change-notes><![CDATA[
+        <h3>0.31.60</h3>
+        <ul>
+            <li>虚拟 Java 候选合并时保留 IntelliJ 原生排序权重，让局部变量和方法参数按原生优先级排列。</li>
+        </ul>
+
+        <h3>0.31.59</h3>
+        <ul>
+            <li>保留虚拟补全中的真实输入前缀，并将光标定位到其后的临时 Java 标识符，修复补全候选被临时文本过滤的问题。</li>
+        </ul>
+
+        <h3>0.31.58</h3>
+        <ul>
+            <li>在虚拟 Java 补全位置插入 IntelliJ 临时标识符，修复输入 <code>.</code> 后不显示成员候选的问题。</li>
+        </ul>
+
+        <h3>0.31.44</h3>
+        <ul>
+            <li>将虚拟 Java PSI 绑定到来源文件及其 VirtualFile，保留 IDEA 的 Java 模块解析上下文。</li>
+        </ul>
+
+        <h3>0.31.43</h3>
+        <ul>
+            <li>将原文件及条件所选版本源码中的 import 显式加入虚拟 Java 文件；<code>MC&gt;1.21.1</code> 会使用 1.21.2 对应模块的导入。</li>
+        </ul>
+
+        <h3>0.31.42</h3>
+        <ul>
+            <li>虚拟 Java 文件分别沿用原文件和条件所选版本模块的解析上下文，并合并 IDEA 原生 Java 补全候选。</li>
+            <li>按当前 MC 版本筛选条件分支中的 import，并为 <code>//#import</code> 补上 Java 语法所需的分号。</li>
+        </ul>
+
+        <h3>0.31.41</h3>
+        <ul>
+            <li><code>//$$</code> Java 补全现在基于包含包、导入、完整类和方法上下文的虚拟 Java 文件运行。</li>
+        </ul>
+
+        <h3>0.31.40</h3>
+        <ul>
+            <li>修正虚拟 Java 补全参数顺序，使用真实光标偏移而不是把补全调用次数当作偏移。</li>
+        </ul>
+
+        <h3>0.31.39</h3>
+        <ul>
+            <li>虚拟 Java 片段同时使用原文件和所选版本模块的解析范围，让原文件导入的项目类参与补全。</li>
+        </ul>
+
+        <h3>0.31.38</h3>
+        <ul>
+            <li>虚拟 Java 视图没有候选时不再拦截 IDEA 的其他补全提供器，避免弹出“无建议”。</li>
+        </ul>
+
+        <h3>0.31.37</h3>
+        <ul>
+            <li>Java 候选的前缀也从虚拟 Java 代码计算，避免旧注释文本规则筛掉原生候选。</li>
+        </ul>
+
+        <h3>0.31.36</h3>
+        <ul>
+            <li><code>//$$</code> 中的 Java 补全完全取自带有原文件上下文的虚拟 Java 视图，不再混入自定义的关键字、return、局部变量、参数或成员补全。</li>
+        </ul>
+
+        <h3>0.31.35</h3>
+        <ul>
+            <li>修复嵌套 <code>//$$</code> 标记遮住虚拟 Java 代码的问题，并将原文件普通 import 传入虚拟代码片段。</li>
+        </ul>
+
+        <h3>0.31.34</h3>
+        <ul>
+            <li>为全部预处理条件语法区分控制词与逻辑运算符，并补充单独的 ! 运算符高亮。</li>
+        </ul>
+
         <h3>0.31.33</h3>
         <ul>
             <li>插件 ID 更名为 rems.idea.preprocessor，与新项目名称一致。</li>
@@ -217,7 +289,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.java</depends>
     <extensions defaultExtensionNs="com.intellij">
-        <completion.contributor language="JAVA"
+        <completion.contributor language="JAVA" order="first"
                                 implementationClass="rems.idea.mixincompletion.MixinDescriptorCompletionContributor"/>
         <typedHandler implementation="rems.idea.mixincompletion.MixinCommentTypedHandler" order="first"/>
         <completion.confidence language="JAVA"

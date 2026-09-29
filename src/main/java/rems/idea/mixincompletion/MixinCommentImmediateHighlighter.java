@@ -105,6 +105,11 @@ public final class MixinCommentImmediateHighlighter implements EditorFactoryList
                     addMatches(editor, highlighters, lineStart + argumentStart,
                             condition, MixinCommentSyntaxAnnotator.PREPROCESSOR_NUMBER,
                             MixinCommentSyntaxAnnotator.MUTED_BLUE);
+                    if (MixinCommentSyntaxAnnotator.isConditionalDirective(preprocessor.group(2))) {
+                        addMatches(editor, highlighters, lineStart + argumentStart,
+                                condition, MixinCommentSyntaxAnnotator.PREPROCESSOR_CONTROL,
+                                MixinCommentSyntaxAnnotator.MUTED_ROSE);
+                    }
                     if (codeStart >= 0) {
                         while (codeStart < argument.length() && Character.isWhitespace(argument.charAt(codeStart))) codeStart++;
                         String code = argument.substring(codeStart);
@@ -140,6 +145,11 @@ public final class MixinCommentImmediateHighlighter implements EditorFactoryList
                     addMatches(editor, highlighters, lineStart + argumentStart,
                             argument, MixinCommentSyntaxAnnotator.PREPROCESSOR_NUMBER,
                             MixinCommentSyntaxAnnotator.MUTED_BLUE);
+                    if (MixinCommentSyntaxAnnotator.isConditionalDirective(embeddedPreprocessor.group(3))) {
+                        addMatches(editor, highlighters, lineStart + argumentStart,
+                                argument, MixinCommentSyntaxAnnotator.PREPROCESSOR_CONTROL,
+                                MixinCommentSyntaxAnnotator.MUTED_ROSE);
+                    }
                 }
                 addLeadingCodeMarkerColors(editor, highlighters, lineStart, text,
                         embeddedPreprocessor.start(1), embeddedPreprocessor.end(1), markerColors);
@@ -175,6 +185,9 @@ public final class MixinCommentImmediateHighlighter implements EditorFactoryList
                     addMatches(editor, highlighters, lineStart + restStart, condition,
                             MixinCommentSyntaxAnnotator.PREPROCESSOR_NUMBER,
                             MixinCommentSyntaxAnnotator.MUTED_BLUE);
+                    addMatches(editor, highlighters, lineStart + restStart, condition,
+                            MixinCommentSyntaxAnnotator.PREPROCESSOR_CONTROL,
+                            MixinCommentSyntaxAnnotator.MUTED_ROSE);
                 }
                 if (separator >= 0) add(editor, highlighters,
                         lineStart + separator, lineStart + separator + 1,
